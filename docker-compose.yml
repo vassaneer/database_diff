@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  db_diff:
+    build: .
+    ports:
+      - "8083:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html
+      - ./pkg:/usr/share/nginx/html/pkg
+    restart: unless-stopped

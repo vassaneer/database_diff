@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Database Schema Comparison</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-section {
+            margin-bottom: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            display: block;
+            margin: 20px auto;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result-section {
+            margin-top: 30px;
+        }
+        .diff-result {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        .diff-result.collapsed {
+            background-color: #f0f0f0;
+        }
+        .diff-header {
+            font-weight: bold;
+            padding: 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #eee;
+            border-radius: 4px 4px 0 0;
+        }
+        .diff-header::after {
+            content: "▼";
+            font-size: 12px;
+        }
+        .diff-header.collapsed::after {
+            content: "►";
+        }
+        .diff-title {
+            color: #333;
+        }
+        .diff-content {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-all;
+            padding: 0 15px 15px 15px;
+            margin-top: 0;
+        }
+        .collapsed + .diff-content {
+            display: none;
+        }
+        .added {
+            color: #4CAF50;
+        }
+        .removed {
+            color: #f44336;
+        }
+        .changed {
+            color: #ff9800;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            background-color: #eee;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+            position: relative;
+            top: 1px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .tutorial-btn {
+            background-color: #2196F3;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            white-space: nowrap;
+        }
+        .tutorial-btn:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="flex-grow: 1; text-align: center;">
+                <h1 style="margin: 0;">Database Schema Comparison</h1>
+            </div>
+            <button id="tutorialBtn" class="tutorial-btn">
+                Tutorial
+            </button>
+        </div>
+
+        <div class="input-section">
+            <h2>First Schema</h2>
+            <textarea id="schema1" placeholder='[{"table_name": "users", "column_name": "id", "data_type": "integer", ...}, ...]'></textarea>
+
+            <h2>Second Schema</h2>
+            <textarea id="schema2" placeholder='[{"table_name": "users", "column_name": "id", "data_type": "bigint", ...}, ...]'></textarea>
+
+            <button id="compareBtn">Compare Schemas</button>
+        </div>
+
+        <div class="result-section">
+            <h2>Comparison Results</h2>
+            <div id="results"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import init, { compare_schemas } from './pkg/db_diff.js';
+
+        // Wait for the page to load
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log("Page loaded");
+
+            // Initialize the WASM module
+            try {
+                await init();
+                console.log("WASM module initialized");
+            } catch (e) {
+                console.error("Failed to initialize WASM module:", e);
+                document.getElementById('results').innerHTML =
+                    `<div class="diff-result"><div class="diff-title error">Error</div><div class="diff-content">Failed to initialize WASM module: ${e.message}</div></div>`;
+                return;
+            }
+
+            // Set up the tutorial button
+            document.getElementById('tutorialBtn').addEventListener('click', function() {
+                // Load the export query SQL file content
+                fetch('export_query.sql')
+                    .then(response => response.text())
+                    .then(data => {
+                        console.log(data);
+                        alert("To export your database schema:\n\n1. Replace 'your_database_name' in the query with your actual database name.\n2. Run the query in your database client.\n3. Export the results as JSON format.\n4. Paste the JSON into the schema text areas above.\n\nExport Query:\n" + data);
+                    })
+                    .catch(error => {
+                        console.error('Error loading export query:', error);
+                        alert('Error loading export query. Please check the export_query.sql file.');
+                    });
+            });
+
+            // Set up the compare button
+            document.getElementById('compareBtn').addEventListener('click', async function() {
+                console.log("Compare button clicked");
+                const schema1Text = document.getElementById('schema1').value;
+                const schema2Text = document.getElementById('schema2').value;
+
+                if (!schema1Text || !schema2Text) {
+                    alert('Please provide both schemas');
+                    return;
+                }
+
+                try {
+                    // Call the WASM function
+                    console.log("Calling WASM compare_schemas function");
+                    const result = compare_schemas(schema1Text, schema2Text);
+                    console.log("WASM result:", result);
+                    console.log("Result type:", typeof result);
+
+                    // Check if the result is an error message from the WASM function
+                    if (result.startsWith("Error parsing first JSON:") ||
+                        result.startsWith("Error parsing second JSON:") ||
+                        result.startsWith("Error serializing result:")) {
+                        alert("JSON Parse Error: " + result);
+                        document.getElementById('results').innerHTML =
+                            `<div class="diff-result"><div class="diff-title error">Error</div><div class="diff-content">${result}</div></div>`;
+                        return;
+                    }
+
+                    const parsedResult = JSON.parse(result);
+                    console.log("Parsed result:", parsedResult);
+                    console.log("Parsed result type:", typeof parsedResult);
+                    displayResults(parsedResult);
+                } catch (e) {
+                    const errorMessage = e.message || "An unknown error occurred";
+                    console.error("Error during comparison:", errorMessage);
+                    document.getElementById('results').innerHTML =
+                        `<div class="diff-result"><div class="diff-title error">Error</div><div class="diff-content">${errorMessage}</div></div>`;
+                }
+            });
+
+            // Display results function
+            function displayResults(result) {
+                const resultsContainer = document.getElementById('results');
+                resultsContainer.innerHTML = '';
+
+                // Create tabs for diff and SQL
+                const tabs = document.createElement('div');
+                tabs.className = 'tabs';
+
+                const diffTab = document.createElement('div');
+                diffTab.className = 'tab active';
+                diffTab.textContent = 'Differences';
+                diffTab.addEventListener('click', function() {
+                    document.querySelector('.tab.active').classList.remove('active');
+                    document.querySelector('.tab-content.active').classList.remove('active');
+                    this.classList.add('active');
+                    document.getElementById('diff-content').classList.add('active');
+                });
+
+                const sqlTab = document.createElement('div');
+                sqlTab.className = 'tab';
+                sqlTab.textContent = 'SQL Statements';
+                sqlTab.addEventListener('click', function() {
+                    document.querySelector('.tab.active').classList.remove('active');
+                    document.querySelector('.tab-content.active').classList.remove('active');
+                    this.classList.add('active');
+                    document.getElementById('sql-content').classList.add('active');
+                });
+
+                tabs.appendChild(diffTab);
+                tabs.appendChild(sqlTab);
+                resultsContainer.appendChild(tabs);
+
+                // Create diff content
+                const diffContent = document.createElement('div');
+                diffContent.id = 'diff-content';
+                diffContent.className = 'tab-content active';
+
+                // Display the diff results
+                const diff = result.diff;
+                if (!diff) {
+                    diffContent.innerHTML = '<p>No diff data found in the result.</p>';
+                    resultsContainer.appendChild(diffContent);
+                    return;
+                }
+
+                // Check if there are any differences
+                const hasDifferences =
+                    (diff.tables_only_in_first && diff.tables_only_in_first.length > 0) ||
+                    (diff.tables_only_in_second && diff.tables_only_in_second.length > 0) ||
+                    (diff.columns_only_in_first && diff.columns_only_in_first.length > 0) ||
+                    (diff.columns_only_in_second && diff.columns_only_in_second.length > 0) ||
+                    (diff.columns_with_different_definitions && diff.columns_with_different_definitions.length > 0);
+
+                if (!hasDifferences) {
+                    diffContent.innerHTML = '<p>No differences found between the schemas.</p>';
+                } else {
+                    // Display tables only in first schema
+                    if (diff.tables_only_in_first && diff.tables_only_in_first.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'diff-result';
+                        section.innerHTML = `
+                            <div class="diff-header">
+                                <span class="diff-title">Tables Only in First Schema</span>
+                            </div>
+                            <div class="diff-content">
+                                ${diff.tables_only_in_first.map(([schema, table]) =>
+                                    `<div class="removed">- ${schema}.${table}</div>`).join('')}
+                            </div>
+                        `;
+                        diffContent.appendChild(section);
+                    }
+
+                    // Display tables only in second schema
+                    if (diff.tables_only_in_second && diff.tables_only_in_second.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'diff-result';
+                        section.innerHTML = `
+                            <div class="diff-header">
+                                <span class="diff-title">Tables Only in Second Schema</span>
+                            </div>
+                            <div class="diff-content">
+                                ${diff.tables_only_in_second.map(([schema, table]) =>
+                                    `<div class="added">+ ${schema}.${table}</div>`).join('')}
+                            </div>
+                        `;
+                        diffContent.appendChild(section);
+                    }
+
+                    // Display columns only in first schema
+                    if (diff.columns_only_in_first && diff.columns_only_in_first.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'diff-result';
+                        section.innerHTML = `
+                            <div class="diff-header">
+                                <span class="diff-title">Columns Only in First Schema</span>
+                            </div>
+                            <div class="diff-content">
+                                ${diff.columns_only_in_first.map(col =>
+                                    `<div class="removed">- ${col.table_schema}.${col.table_name}.${col.column_name} (${col.data_type})</div>`).join('')}
+                            </div>
+                        `;
+                        diffContent.appendChild(section);
+                    }
+
+                    // Display columns only in second schema
+                    if (diff.columns_only_in_second && diff.columns_only_in_second.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'diff-result';
+                        section.innerHTML = `
+                            <div class="diff-header">
+                                <span class="diff-title">Columns Only in Second Schema</span>
+                            </div>
+                            <div class="diff-content">
+                                ${diff.columns_only_in_second.map(col =>
+                                    `<div class="added">+ ${col.table_schema}.${col.table_name}.${col.column_name} (${col.data_type})</div>`).join('')}
+                            </div>
+                        `;
+                        diffContent.appendChild(section);
+                    }
+
+                    // Display columns with different definitions
+                    if (diff.columns_with_different_definitions && diff.columns_with_different_definitions.length > 0) {
+                        const section = document.createElement('div');
+                        section.className = 'diff-result';
+                        section.innerHTML = `
+                            <div class="diff-header">
+                                <span class="diff-title">Columns with Different Definitions</span>
+                            </div>
+                            <div class="diff-content">
+                                ${diff.columns_with_different_definitions.map(diff => `
+                                    <div class="changed">${diff.table_name}.${diff.column_name}</div>
+                                    <div style="margin-left: 20px;">
+                                        <div>First: ${diff.first.data_type} (nullable: ${diff.first.is_nullable})</div>
+                                        <div>Second: ${diff.second.data_type} (nullable: ${diff.second.is_nullable})</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `;
+                        diffContent.appendChild(section);
+                    }
+                }
+
+                resultsContainer.appendChild(diffContent);
+
+                // Create SQL content
+                const sqlContent = document.createElement('div');
+                sqlContent.id = 'sql-content';
+                sqlContent.className = 'tab-content';
+
+                // Handle object format for SQL statements
+                if (result.sql && typeof result.sql === 'object' && Object.keys(result.sql).length > 0) {
+                    // Create a collapsible section for each SQL statement
+                    Object.entries(result.sql).forEach(([key, statement]) => {
+                        const section = document.createElement('div');
+                        section.className = 'diff-result';
+
+                        // Split multi-line statements and format them properly
+                        const formattedStatement = statement.split('\n').map(line => `<div>${line}</div>`).join('');
+
+                        section.innerHTML = `
+                            <div class="diff-header">
+                                <span class="diff-title">${key}</span>
+                            </div>
+                            <div class="diff-content">
+                                ${formattedStatement}
+                            </div>
+                        `;
+                        sqlContent.appendChild(section);
+                    });
+                } else {
+                    sqlContent.innerHTML = `
+                        <div class="diff-result">
+                            <div class="diff-header">
+                                <span class="diff-title">SQL Statements</span>
+                            </div>
+                            <div class="diff-content">
+                                <div>No SQL statements available.</div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                resultsContainer.appendChild(sqlContent);
+
+                // Add click handlers for collapsible sections in diff content
+                diffContent.querySelectorAll('.diff-header').forEach(header => {
+                    header.addEventListener('click', function() {
+                        this.classList.toggle('collapsed');
+                        this.nextElementSibling.classList.toggle('collapsed');
+                    });
+                });
+
+                // Add click handlers for collapsible sections in SQL content
+                sqlContent.querySelectorAll('.diff-header').forEach(header => {
+                    header.addEventListener('click', function() {
+                        this.classList.toggle('collapsed');
+                        this.nextElementSibling.classList.toggle('collapsed');
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

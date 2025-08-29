@@ -1,0 +1,38 @@
+# Exclude git directory
+.git
+.gitignore
+
+# Exclude IDE files
+.vscode/
+.idea/
+
+# Exclude target directories
+target/
+pkg/
+
+# Exclude log files
+*.log
+
+# Exclude test files that aren't needed in production
+tests/
+*.rs.bk
+
+# Exclude documentation
+doc/
+docs/
+
+# Exclude temporary files
+*.tmp
+*.bak
+
+# Exclude environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Exclude Docker related files (except this one)
+docker-compose.yml
+Dockerfile
+.dockerignore

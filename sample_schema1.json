@@ -1,0 +1,56 @@
+[
+  {
+    "table_schema": "public",
+    "table_name": "users",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": null,
+    "character_maximum_length": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "users",
+    "column_name": "name",
+    "data_type": "varchar",
+    "is_nullable": "YES",
+    "column_default": null,
+    "character_maximum_length": 255
+  },
+  {
+    "table_schema": "public",
+    "table_name": "users",
+    "column_name": "email",
+    "data_type": "varchar",
+    "is_nullable": "YES",
+    "column_default": null,
+    "character_maximum_length": 255
+  },
+  {
+    "table_schema": "public",
+    "table_name": "posts",
+    "column_name": "id",
+    "data_type": "integer",
+    "is_nullable": "NO",
+    "column_default": null,
+    "character_maximum_length": null
+  },
+  {
+    "table_schema": "public",
+    "table_name": "posts",
+    "column_name": "title",
+    "data_type": "varchar",
+    "is_nullable": "NO",
+    "column_default": null,
+    "character_maximum_length": 255
+  },
+  {
+    "table_schema": "public",
+    "table_name": "posts",
+    "column_name": "content",
+    "data_type": "text",
+    "is_nullable": "YES",
+    "column_default": null,
+    "character_maximum_length": null
+  }
+]
