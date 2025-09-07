@@ -2,7 +2,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json;
 use wasm_bindgen::prelude::*;
 use std::collections::{HashMap, HashSet};
-
+use web_sys::{File, FileReader};
+use wasm_bindgen::JsCast;
+use js_sys::Promise;
+use encoding_rs;
 
 // Custom deserializer to handle both string and integer representations
 fn deserialize_optional_string_as_int<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
@@ -397,29 +400,7 @@ pub fn compare_schema_maps(
 
     sql_statements
     }
-//                     column.table_schema, column.table_name, column.column_name
-//                 )
-//             );
-//         }
-//     }
-//
-//     // Modify columns that have different definitions (to match schema 1)
-//     if !diff.columns_with_different_definitions.is_empty() {
-//         for diff_item in &diff.columns_with_different_definitions {
-//             // Generate a MODIFY statement based on the first schema (target)
-//             let column_def = format_column_definition(&diff_item.first);
-//             sql_statements.insert(
-//                 format!("Modify column in Schema 2"),
-//                 format!(
-//                     "ALTER TABLE {}.{} MODIFY COLUMN {} {};",
-//                     diff_item.first.table_schema, diff_item.table_name, diff_item.column_name, column_def
-//                 )
-//             );
-//         }
-//     }
-//
-//     sql_statements
-// }
+
 
 fn format_column_definition(column: &ColumnInfo) -> String {
     let mut definition = column.data_type.clone();
@@ -450,4 +431,39 @@ fn format_column_definition(column: &ColumnInfo) -> String {
     }
 
     definition
+}
+
+#[wasm_bindgen]
+pub fn process_uploaded_file(file: File) -> Promise {
+    let file_reader = FileReader::new().unwrap();
+
+    // Create a promise to handle the async operation
+    let promise = js_sys::Promise::new(&mut |resolve, _reject| {
+        let file_reader_clone = file_reader.clone();
+        let onloaded_closure = Closure::wrap(Box::new(move |_event: web_sys::ProgressEvent| {
+            let result = file_reader_clone.result().unwrap();
+            let array_buffer = result.dyn_into::<js_sys::ArrayBuffer>().unwrap();
+            let data = js_sys::Uint8Array::new(&array_buffer).to_vec();
+
+            // Try to decode as UTF-8 first For Thai decoder
+            let rust_string = match String::from_utf8(data.clone()) {
+                Ok(s) => s,
+                Err(_) => {
+                    // If UTF-8 fails, try to decode as WINDOWS_874 (which covers TIS-620 for Thai)
+                    let (cow, _encoding_used, _had_errors) = encoding_rs::WINDOWS_874.decode(&data);
+                    cow.into_owned()
+                }
+            };
+            // let rust_string = encoding_rs::WINDOWS_874.decode(&data).to_owned();
+            // web_sys::console::log_1(&format!("File content (string): {:?}", rust_string).into());
+            let js_string = js_sys::JsString::from(rust_string);
+            resolve.call1(&resolve, &js_string).unwrap();
+        }) as Box<dyn FnMut(web_sys::ProgressEvent)>);
+
+        file_reader.set_onloadend(Some(onloaded_closure.as_ref().unchecked_ref()));
+        onloaded_closure.forget();
+    });
+
+    file_reader.read_as_array_buffer(&file).unwrap();
+    Promise::from(promise)
 }

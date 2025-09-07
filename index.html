@@ -153,10 +153,11 @@
         <div class="input-section">
             <h2>First Schema</h2>
             <textarea id="schema1" placeholder='[{"table_name": "users", "column_name": "id", "data_type": "integer", ...}, ...]'></textarea>
+            <input type="file" id="file-input-1">
 
             <h2>Second Schema</h2>
             <textarea id="schema2" placeholder='[{"table_name": "users", "column_name": "id", "data_type": "bigint", ...}, ...]'></textarea>
-
+            <input type="file" id="file-input-2">
             <button id="compareBtn">Compare Schemas</button>
         </div>
 
@@ -167,7 +168,7 @@
     </div>
 
     <script type="module">
-        import init, { compare_schemas } from './pkg/db_diff.js';
+        import init, { compare_schemas, process_uploaded_file } from './pkg/db_diff.js';
 
         // Wait for the page to load
         document.addEventListener('DOMContentLoaded', async function() {
@@ -441,6 +442,35 @@
                 });
             }
         });
+
+        // read data from file
+        const fileInput1 = document.getElementById('file-input-1');
+        fileInput1.addEventListener('change', async (event)=>{
+          const file = event.target.files[0];
+          if (file) {
+            try {
+              const content = await process_uploaded_file(file);
+              // Put the content in the first schema textarea
+              document.getElementById('schema1').value = content;
+            } catch (error) {
+              console.error("Error processing file:", error);
+            }
+          }
+        })
+
+        const fileInput2 = document.getElementById('file-input-2');
+        fileInput2.addEventListener('change', async (event)=>{
+          const file = event.target.files[0];
+          if (file) {
+            try {
+              const content = await process_uploaded_file(file);
+              // Put the content in the first schema textarea
+              document.getElementById('schema2').value = content;
+            } catch (error) {
+              console.error("Error processing file:", error);
+            }
+          }
+        })
     </script>
 </body>
 </html>
