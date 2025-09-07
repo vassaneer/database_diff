@@ -191,7 +191,6 @@
                 fetch('export_query.sql')
                     .then(response => response.text())
                     .then(data => {
-                        console.log(data);
                         alert("To export your database schema:\n\n1. Replace 'your_database_name' in the query with your actual database name.\n2. Run the query in your database client.\n3. Export the results as JSON format.\n4. Paste the JSON into the schema text areas above.\n\nExport Query:\n" + data);
                     })
                     .catch(error => {
@@ -202,7 +201,6 @@
 
             // Set up the compare button
             document.getElementById('compareBtn').addEventListener('click', async function() {
-                console.log("Compare button clicked");
                 const schema1Text = document.getElementById('schema1').value;
                 const schema2Text = document.getElementById('schema2').value;
 
@@ -213,10 +211,7 @@
 
                 try {
                     // Call the WASM function
-                    console.log("Calling WASM compare_schemas function");
                     const result = compare_schemas(schema1Text, schema2Text);
-                    console.log("WASM result:", result);
-                    console.log("Result type:", typeof result);
 
                     // Check if the result is an error message from the WASM function
                     if (result.startsWith("Error parsing first JSON:") ||
@@ -229,8 +224,6 @@
                     }
 
                     const parsedResult = JSON.parse(result);
-                    console.log("Parsed result:", parsedResult);
-                    console.log("Parsed result type:", typeof parsedResult);
                     displayResults(parsedResult);
                 } catch (e) {
                     const errorMessage = e.message || "An unknown error occurred";
