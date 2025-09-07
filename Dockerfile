@@ -21,10 +21,7 @@ COPY export_query.sql ./
 
 # Build the WASM package (this will generate a new Cargo.lock)
 RUN mkdir -p pkg && \
-    wasm-pack build --target web --out-dir pkg || \
-    # If build fails, try cleaning and rebuilding
-    (rm -f Cargo.lock && cargo clean && wasm-pack build --target web --out-dir pkg)
-
+    wasm-pack build --target web --out-dir pkg
 # Use nginx for serving the static files
 FROM nginx:alpine
 

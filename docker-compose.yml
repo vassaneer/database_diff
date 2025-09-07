@@ -7,5 +7,5 @@ services:
       - "8083:80"
     volumes:
       - ./index.html:/usr/share/nginx/html/index.html
-      - ./pkg:/usr/share/nginx/html/pkg
+      # - ./pkg:/usr/share/nginx/html/pkg
     restart: unless-stopped
