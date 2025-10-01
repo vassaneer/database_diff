@@ -6,45 +6,43 @@ mod tests {
     fn test_schema_comparison_with_table_schema() {
         // Create test data with different schemas
         let columns1 = vec![
-            ColumnInfo {
-                table_schema: "schema1".to_string(),
-                table_name: "users".to_string(),
-                column_name: "id".to_string(),
-                data_type: "integer".to_string(),
-                is_nullable: "NO".to_string(),
-                column_default: None,
-                character_maximum_length: None,
-            },
-            ColumnInfo {
-                table_schema: "schema1".to_string(),
-                table_name: "users".to_string(),
-                column_name: "name".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(255),
-            },
-        ];
+        ColumnInfo::builder(
+            "schema1".to_string(),
+            "users".to_string(),
+            "name1".to_string(),
+            "varchar".to_string(),
+            "varchar(255)".to_string(),
+            "YES".to_string(),
+        )
+        .set_character_maximum_length(255),
+            ColumnInfo::builder(
+                "schema1".to_string(),
+                "users".to_string(),
+                "id".to_string(),
+                "integer".to_string(),
+                "int(11)".to_string(),
+                "NO".to_string(),
+            ),
 
+        ];
         let columns2 = vec![
-            ColumnInfo {
-                table_schema: "schema2".to_string(),
-                table_name: "users".to_string(),
-                column_name: "id".to_string(),
-                data_type: "integer".to_string(),
-                is_nullable: "NO".to_string(),
-                column_default: None,
-                character_maximum_length: None,
-            },
-            ColumnInfo {
-                table_schema: "schema2".to_string(),
-                table_name: "users".to_string(),
-                column_name: "email".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(255),
-            },
+            ColumnInfo::builder(
+                "schema2".to_string(),
+                "users".to_string(),
+                "id".to_string(),
+                "integer".to_string(),
+                "int(11)".to_string(),
+                "NO".to_string(),
+            ),
+            ColumnInfo::builder(
+                "schema2".to_string(),
+                "users".to_string(),
+                "email".to_string(),
+                "varchar".to_string(),
+                "varchar(255)".to_string(),
+                "YES".to_string(),
+            )
+            .set_character_maximum_length(255),
         ];
 
         let map1 = build_schema_map(columns1);
@@ -56,7 +54,7 @@ mod tests {
         // So we should have tables only in first and tables only in second
         assert_eq!(diff.tables_only_in_first.len(), 1);
         assert_eq!(diff.tables_only_in_second.len(), 1);
-        
+
         // And no column differences since they're considered different tables
         assert_eq!(diff.columns_only_in_first.len(), 0);
         assert_eq!(diff.columns_only_in_second.len(), 0);
@@ -67,27 +65,25 @@ mod tests {
     fn test_schema_comparison_same_table_different_schemas() {
         // Test that tables with the same name but different schemas are treated as different
         let columns1 = vec![
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "id".to_string(),
-                data_type: "integer".to_string(),
-                is_nullable: "NO".to_string(),
-                column_default: None,
-                character_maximum_length: None,
-            },
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "id".to_string(),
+                "integer".to_string(),
+                "int(11)".to_string(),
+                "NO".to_string(),
+            ),
         ];
 
         let columns2 = vec![
-            ColumnInfo {
-                table_schema: "private".to_string(),
-                table_name: "users".to_string(),
-                column_name: "id".to_string(),
-                data_type: "integer".to_string(),
-                is_nullable: "NO".to_string(),
-                column_default: None,
-                character_maximum_length: None,
-            },
+            ColumnInfo::builder(
+                "private".to_string(),
+                "users".to_string(),
+                "id".to_string(),
+                "integer".to_string(),
+                "int(11)".to_string(),
+                "NO".to_string(),
+            ),
         ];
 
         let map1 = build_schema_map(columns1);
@@ -107,45 +103,43 @@ mod tests {
     fn test_schema_comparison_same_table_same_schema() {
         // Test that tables with the same name and same schema are compared properly
         let columns1 = vec![
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "id".to_string(),
-                data_type: "integer".to_string(),
-                is_nullable: "NO".to_string(),
-                column_default: None,
-                character_maximum_length: None,
-            },
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "name".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(255),
-            },
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "id".to_string(),
+                "integer".to_string(),
+                "int(11)".to_string(),
+                "NO".to_string(),
+            ),
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "name".to_string(),
+                "varchar".to_string(),
+                "varchar(255)".to_string(),
+                "YES".to_string(),
+            )
+            .set_character_maximum_length(255),
         ];
 
         let columns2 = vec![
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "id".to_string(),
-                data_type: "bigint".to_string(), // Different data type
-                is_nullable: "NO".to_string(),
-                column_default: None,
-                character_maximum_length: None,
-            },
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "email".to_string(), // Different column
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(255),
-            },
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "id".to_string(),
+                "bigint".to_string(), // Different data type
+                "bigint".to_string(),
+                "NO".to_string(),
+            ),
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "email".to_string(), // Different column
+                "varchar".to_string(),
+                "varchar(255)".to_string(),
+                "YES".to_string(),
+            )
+            .set_character_maximum_length(255),
         ];
 
         let map1 = build_schema_map(columns1);
@@ -174,27 +168,27 @@ mod tests {
     fn test_sql_generation_with_table_schema() {
         // Test that SQL generation includes schema names
         let columns1 = vec![
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "name".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(255),
-            },
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "name".to_string(),
+                "varchar".to_string(),
+                "varchar(255)".to_string(),
+                "YES".to_string(),
+            )
+            .set_character_maximum_length(255),
         ];
 
         let columns2 = vec![
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "email".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(255),
-            },
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "email".to_string(),
+                "varchar".to_string(),
+                "varchar(255)".to_string(),
+                "YES".to_string(),
+            )
+            .set_character_maximum_length(255),
         ];
 
         let map1 = build_schema_map(columns1);
@@ -204,7 +198,7 @@ mod tests {
         let sql_statements = generate_sql_diff(&diff);
 
         // Verify SQL statements include schema names
-        assert!(sql_statements.values().any(|s| s.contains("ALTER TABLE public.users DROP COLUMN name")));
-        assert!(sql_statements.values().any(|s| s.contains("ALTER TABLE public.users ADD COLUMN email")));
+        assert!(sql_statements.values().any(|s| s.contains("ALTER TABLE `public`.users DROP COLUMN name")));
+        assert!(sql_statements.values().any(|s| s.contains("ALTER TABLE `public`.users ADD COLUMN email")));
     }
 }

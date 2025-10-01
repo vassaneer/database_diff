@@ -5,33 +5,31 @@ use serde_json;
 #[test]
 fn test_build_schema_map() {
     let columns = vec![
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "id".to_string(),
-            data_type: "integer".to_string(),
-            is_nullable: "NO".to_string(),
-            column_default: None,
-            character_maximum_length: None,
-        },
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "name".to_string(),
-            data_type: "varchar".to_string(),
-            is_nullable: "YES".to_string(),
-            column_default: None,
-            character_maximum_length: Some(255),
-        },
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "products".to_string(),
-            column_name: "id".to_string(),
-            data_type: "integer".to_string(),
-            is_nullable: "NO".to_string(),
-            column_default: None,
-            character_maximum_length: None,
-        },
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "id".to_string(),
+            "integer".to_string(),
+            "int(11)".to_string(),
+            "NO".to_string(),
+        ),
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "name".to_string(),
+            "varchar".to_string(),
+            "varchar(255)".to_string(),
+            "YES".to_string(),
+        )
+        .set_character_maximum_length(255),
+        ColumnInfo::builder(
+            "public".to_string(),
+            "products".to_string(),
+            "id".to_string(),
+            "integer".to_string(),
+            "int(11)".to_string(),
+            "NO".to_string(),
+        ),
     ];
 
     let schema_map = build_schema_map(columns);
@@ -40,40 +38,39 @@ fn test_build_schema_map() {
     assert_eq!(schema_map.len(), 2);
 
     // Users table should have 2 columns
-    assert_eq!(schema_map.get("public.users").unwrap().len(), 2);
+    assert_eq!(schema_map.get("`public`.users").unwrap().len(), 2);
 
     // Products table should have 1 column
-    assert_eq!(schema_map.get("public.products").unwrap().len(), 1);
+    assert_eq!(schema_map.get("`public`.products").unwrap().len(), 1);
 
     // Check specific column details
-    let users_id = &schema_map.get("public.users").unwrap().get("id").unwrap();
+    let users_id = &schema_map.get("`public`.users").unwrap().get("id").unwrap();
     assert_eq!(users_id.data_type, "integer");
 
-    let users_name = &schema_map.get("public.users").unwrap().get("name").unwrap();
+    let users_name = &schema_map.get("`public`.users").unwrap().get("name").unwrap();
     assert_eq!(users_name.character_maximum_length, Some(255));
 }
 
 #[test]
 fn test_compare_schema_maps_identical() {
     let columns = vec![
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "id".to_string(),
-            data_type: "integer".to_string(),
-            is_nullable: "NO".to_string(),
-            column_default: None,
-            character_maximum_length: None,
-        },
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "name".to_string(),
-            data_type: "varchar".to_string(),
-            is_nullable: "YES".to_string(),
-            column_default: None,
-            character_maximum_length: Some(255),
-        },
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "id".to_string(),
+            "integer".to_string(),
+            "int(11)".to_string(),
+            "NO".to_string(),
+        ),
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "name".to_string(),
+            "varchar".to_string(),
+            "varchar(255)".to_string(),
+            "YES".to_string(),
+        )
+        .set_character_maximum_length(255),
     ];
 
     let map1 = build_schema_map(columns.clone());
@@ -92,45 +89,43 @@ fn test_compare_schema_maps_identical() {
 #[test]
 fn test_compare_schema_maps_with_differences() {
     let columns1 = vec![
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "id".to_string(),
-            data_type: "integer".to_string(),
-            is_nullable: "NO".to_string(),
-            column_default: None,
-            character_maximum_length: None,
-        },
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "name".to_string(),
-            data_type: "varchar".to_string(),
-            is_nullable: "YES".to_string(),
-            column_default: None,
-            character_maximum_length: Some(255),
-        },
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "id".to_string(),
+            "integer".to_string(),
+            "int(11)".to_string(),
+            "NO".to_string(),
+        ),
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "name".to_string(),
+            "varchar".to_string(),
+            "varchar(255)".to_string(),
+            "YES".to_string(),
+        )
+        .set_character_maximum_length(255),
     ];
 
     let columns2 = vec![
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "id".to_string(),
-            data_type: "bigint".to_string(), // Different data type
-            is_nullable: "NO".to_string(),
-            column_default: None,
-            character_maximum_length: None,
-        },
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "email".to_string(), // Different column
-            data_type: "varchar".to_string(),
-            is_nullable: "YES".to_string(),
-            column_default: None,
-            character_maximum_length: Some(255),
-        },
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "id".to_string(),
+            "bigint".to_string(), // Different data type
+            "bigint".to_string(),
+            "NO".to_string(),
+        ),
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "email".to_string(), // Different column
+            "varchar".to_string(),
+            "varchar(255)".to_string(),
+            "YES".to_string(),
+        )
+        .set_character_maximum_length(255),
     ];
 
     let map1 = build_schema_map(columns1);
@@ -158,27 +153,25 @@ fn test_compare_schema_maps_with_differences() {
 #[test]
 fn test_compare_schema_maps_different_tables() {
     let columns1 = vec![
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "users".to_string(),
-            column_name: "id".to_string(),
-            data_type: "integer".to_string(),
-            is_nullable: "NO".to_string(),
-            column_default: None,
-            character_maximum_length: None,
-        },
+        ColumnInfo::builder(
+            "public".to_string(),
+            "users".to_string(),
+            "id".to_string(),
+            "integer".to_string(),
+            "int(11)".to_string(),
+            "NO".to_string(),
+        )
     ];
 
     let columns2 = vec![
-        ColumnInfo {
-            table_schema: "public".to_string(),
-            table_name: "products".to_string(),
-            column_name: "id".to_string(),
-            data_type: "integer".to_string(),
-            is_nullable: "NO".to_string(),
-            column_default: None,
-            character_maximum_length: None,
-        },
+        ColumnInfo::builder(
+            "public".to_string(),
+            "products".to_string(),
+            "id".to_string(),
+            "integer".to_string(),
+            "int(11)".to_string(),
+            "NO".to_string(),
+        ),
     ];
 
     let map1 = build_schema_map(columns1);
@@ -189,8 +182,11 @@ fn test_compare_schema_maps_different_tables() {
     // Should have tables only in first and second
     assert_eq!(diff.tables_only_in_first.len(), 1);
     assert_eq!(diff.tables_only_in_second.len(), 1);
-    assert_eq!(diff.tables_only_in_first[0].1, "users");
-    assert_eq!(diff.tables_only_in_second[0].1, "products");
+    
+    assert_eq!(diff.tables_only_in_first[0].0, "`public`.users");
+    assert_eq!(diff.tables_only_in_second[0].0, "`public`.products");
+    assert_eq!(diff.tables_only_in_first[0].1, "id int(11) NOT NULL,");
+    assert_eq!(diff.tables_only_in_second[0].1, "id int(11) NOT NULL,");
 
     // Should have no column differences
     assert_eq!(diff.columns_only_in_first.len(), 0);
@@ -206,6 +202,7 @@ fn test_character_maximum_length_parsing() {
         "table_name": "users",
         "column_name": "name",
         "data_type": "varchar",
+        "column_type":"varchar(255)",
         "is_nullable": "YES",
         "column_default": null,
         "character_maximum_length": 255
@@ -217,6 +214,7 @@ fn test_character_maximum_length_parsing() {
         "table_name": "users",
         "column_name": "name",
         "data_type": "varchar",
+        "column_type":"varchar(255)",
         "is_nullable": "YES",
         "column_default": null,
         "character_maximum_length": "255"
@@ -228,6 +226,7 @@ fn test_character_maximum_length_parsing() {
         "table_name": "posts",
         "column_name": "content",
         "data_type": "longtext",
+        "column_type":"longtext",
         "is_nullable": "YES",
         "column_default": null,
         "character_maximum_length": 4294967295
@@ -239,6 +238,7 @@ fn test_character_maximum_length_parsing() {
         "table_name": "posts",
         "column_name": "content",
         "data_type": "longtext",
+        "column_type":"longtext",
         "is_nullable": "YES",
         "column_default": null,
         "character_maximum_length": "4294967295"
@@ -250,6 +250,7 @@ fn test_character_maximum_length_parsing() {
         "table_name": "users",
         "column_name": "id",
         "data_type": "integer",
+        "column_type":"int(11)",
         "is_nullable": "NO",
         "column_default": null,
         "character_maximum_length": null
@@ -290,92 +291,89 @@ fn test_generate_sql_diff() {
 
     // Create a test diff with multiple tables
     let diff = SchemaDiff {
-        tables_only_in_first: vec![("public".to_string(), "old_table".to_string())],
-        tables_only_in_second: vec![("public".to_string(), "new_table".to_string())],
+        tables_only_in_first: vec![("`public`.old_table".to_string(), "old_table".to_string())],
+        tables_only_in_second: vec![("`public`.new_table".to_string(), "new_table".to_string())],
         columns_only_in_first: vec![
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "old_column".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(255),
-            },
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "products".to_string(),
-                column_name: "discontinued".to_string(),
-                data_type: "boolean".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: Some("false".to_string()),
-                character_maximum_length: None,
-            }
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "old_column".to_string(),
+                "varchar".to_string(),
+                "varchar(255)".to_string(),
+                "YES".to_string(),
+            )
+            .set_character_maximum_length(255),
+            ColumnInfo::builder(
+                "public".to_string(),
+                "products".to_string(),
+                "discontinued".to_string(),
+                "boolean".to_string(),
+                "boolean".to_string(),
+                "YES".to_string(),
+            )
+            .set_default("false".to_string())
         ],
         columns_only_in_second: vec![
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "users".to_string(),
-                column_name: "new_column".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "NO".to_string(),
-                column_default: Some("default_value".to_string()),
-                character_maximum_length: Some(100),
-            },
-            ColumnInfo {
-                table_schema: "public".to_string(),
-                table_name: "orders".to_string(),
-                column_name: "tracking_number".to_string(),
-                data_type: "varchar".to_string(),
-                is_nullable: "YES".to_string(),
-                column_default: None,
-                character_maximum_length: Some(50),
-            }
+            ColumnInfo::builder(
+                "public".to_string(),
+                "users".to_string(),
+                "new_column".to_string(),
+                "varchar".to_string(),
+                "varchar(100)".to_string(),
+                "NO".to_string(),
+            )
+            .set_character_maximum_length(100)
+            .set_default("default_value".to_string()),
+            ColumnInfo::builder(
+                "public".to_string(),
+                "orders".to_string(),
+                "tracking_number".to_string(),
+                "varchar".to_string(),
+                "varchar(50)".to_string(),
+                "YES".to_string(),
+            )
+            .set_character_maximum_length(50)
         ],
         columns_with_different_definitions: vec![
             ColumnDifference {
                 table_name: "users".to_string(),
                 column_name: "changed_column".to_string(),
-                first: ColumnInfo {
-                    table_schema: "public".to_string(),
-                    table_name: "users".to_string(),
-                    column_name: "changed_column".to_string(),
-                    data_type: "int".to_string(),
-                    is_nullable: "NO".to_string(),
-                    column_default: None,
-                    character_maximum_length: None,
-                },
-                second: ColumnInfo {
-                    table_schema: "public".to_string(),
-                    table_name: "users".to_string(),
-                    column_name: "changed_column".to_string(),
-                    data_type: "bigint".to_string(),
-                    is_nullable: "NO".to_string(),
-                    column_default: None,
-                    character_maximum_length: None,
-                },
+                first: ColumnInfo::builder(
+                    "public".to_string(),
+                    "users".to_string(),
+                    "changed_column".to_string(),
+                    "int".to_string(),
+                    "int".to_string(),
+                    "NO".to_string(),
+                ),
+                second: ColumnInfo::builder(
+                    "public".to_string(),
+                    "users".to_string(),
+                    "changed_column".to_string(),
+                    "bigint".to_string(),
+                    "bigint".to_string(),
+                    "NO".to_string(),
+                ),
             },
             ColumnDifference {
                 table_name: "products".to_string(),
                 column_name: "price".to_string(),
-                first: ColumnInfo {
-                    table_schema: "public".to_string(),
-                    table_name: "products".to_string(),
-                    column_name: "price".to_string(),
-                    data_type: "decimal".to_string(),
-                    is_nullable: "NO".to_string(),
-                    column_default: None,
-                    character_maximum_length: None,
-                },
-                second: ColumnInfo {
-                    table_schema: "public".to_string(),
-                    table_name: "products".to_string(),
-                    column_name: "price".to_string(),
-                    data_type: "decimal".to_string(),
-                    is_nullable: "NO".to_string(),
-                    column_default: None,
-                    character_maximum_length: None,
-                },
+                first: ColumnInfo::builder(
+                    "public".to_string(),
+                    "products".to_string(),
+                    "price".to_string(),
+                    "decimal".to_string(),
+                    "decimal".to_string(),
+                    "NO".to_string(),
+                ),
+                second: ColumnInfo::builder(
+                    "public".to_string(),
+                    "products".to_string(),
+                    "price".to_string(),
+                    "decimal".to_string(),
+                    "decimal".to_string(),
+                    "NO".to_string(),
+                ),
             }
         ],
     };
@@ -390,17 +388,17 @@ fn test_generate_sql_diff() {
     assert!(!sql_statements.is_empty());
 
     // Verify specific statements exist for schema 1 -> schema 2 transformation
-    assert!(statements.iter().any(|s| s.contains("DROP TABLE public.old_table")));
-    assert!(statements.iter().any(|s| s.contains("-- CREATE TABLE public.new_table")));
+    assert!(statements.iter().any(|s| s.contains("DROP TABLE `public`.old_table")));
+    assert!(statements.iter().any(|s| s.contains("-- CREATE TABLE `public`.new_table (new_table)")));
 
     // Verify specific statements exist for schema 2 -> schema 1 transformation
-    assert!(statements.iter().any(|s| s.contains("DROP TABLE public.new_table")));
-    assert!(statements.iter().any(|s| s.contains("-- CREATE TABLE public.old_table")));
+    assert!(statements.iter().any(|s| s.contains("DROP TABLE `public`.new_table")));
+    assert!(statements.iter().any(|s| s.contains("-- CREATE TABLE `public`.old_table (old_table)")));
 
     // Verify specific column operations with schema names
-    assert!(statements.iter().any(|s| s.contains("ALTER TABLE public.users DROP COLUMN old_column")));
-    assert!(statements.iter().any(|s| s.contains("ALTER TABLE public.users ADD COLUMN new_column")));
-    assert!(statements.iter().any(|s| s.contains("ALTER TABLE public.users MODIFY COLUMN changed_column")));
-    assert!(statements.iter().any(|s| s.contains("ALTER TABLE public.products DROP COLUMN discontinued")));
-    assert!(statements.iter().any(|s| s.contains("ALTER TABLE public.orders ADD COLUMN tracking_number")));
+    assert!(statements.iter().any(|s| s.contains("ALTER TABLE `public`.users DROP COLUMN old_column")));
+    assert!(statements.iter().any(|s| s.contains("ALTER TABLE `public`.users ADD COLUMN new_column")));
+    assert!(statements.iter().any(|s| s.contains("ALTER TABLE `public`.users MODIFY COLUMN changed_column")));
+    assert!(statements.iter().any(|s| s.contains("ALTER TABLE `public`.products DROP COLUMN discontinued")));
+    assert!(statements.iter().any(|s| s.contains("ALTER TABLE `public`.orders ADD COLUMN tracking_number")));
 }

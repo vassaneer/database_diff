@@ -2,6 +2,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use serde_json;
 use wasm_bindgen::prelude::*;
 use std::collections::{HashMap, HashSet};
+use indexmap::IndexMap;
 use web_sys::{File, FileReader};
 use wasm_bindgen::JsCast;
 use js_sys::Promise;
@@ -40,10 +41,78 @@ pub struct ColumnInfo {
     pub table_name: String,
     pub column_name: String,
     pub data_type: String,
+    pub column_type: String,
     pub is_nullable: String,
     pub column_default: Option<String>,
+    pub extra: Option<String>,
+    pub column_comment: Option<String>,
     #[serde(deserialize_with = "deserialize_optional_string_as_int")]
     pub character_maximum_length: Option<u64>,
+}
+
+impl ColumnInfo{
+    pub fn builder(table_schema: String, table_name: String, column_name: String, data_type: String, column_type: String, is_nullable: String) -> ColumnInfo {
+        ColumnInfo{
+            table_schema,
+            table_name,
+            column_name,
+            data_type,
+            column_type,
+            is_nullable,
+            column_default: None,
+            extra: None,
+            character_maximum_length: None,
+            column_comment: None,
+        }
+    }
+
+    pub fn set_default(mut self, data: String) -> Self {
+        self.column_default = Some(data);
+        self
+    }
+
+    pub fn set_extra(mut self, data: String) -> Self {
+        self.extra = Some(data);
+        self
+    }
+
+    pub fn set_character_maximum_length(mut self, data: u64) -> Self {
+        self.character_maximum_length = Some(data);
+        self
+    }
+
+    pub fn set_column_comment(mut self, data: String) -> Self {
+        self.column_comment = Some(data);
+        self
+    }
+
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_builder_new_column_info(){
+        let builder = ColumnInfo::builder(
+            "public".to_string(),
+            "old_users".to_string(),
+            "id".to_string(),
+            "integer".to_string(),
+            "int(11)".to_string(),
+            "NO".to_string(),
+        )
+        .set_default("1".to_string())
+        .set_extra("auto_increment".to_string())
+        .set_character_maximum_length(64)
+        .set_column_comment("test".to_string());
+        assert_eq!(builder.table_schema,"public".to_string());
+        assert_eq!(builder.column_default.expect("set default data"),"1".to_string());
+        assert_eq!(builder.extra.expect("set extra data"),"auto_increment".to_string());
+        assert_eq!(builder.character_maximum_length.expect("set extra data"),64);
+        assert_eq!(builder.column_comment.expect("set extra data"),"test".to_string());
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -88,6 +157,7 @@ pub fn compare_schemas(json1: &str, json2: &str) -> String {
     };
 
     // Convert to maps for easier comparison
+    // Create <table, column>
     let map1 = build_schema_map(columns1);
     let map2 = build_schema_map(columns2);
 
@@ -127,27 +197,29 @@ pub fn create_column_info(json: &str) -> Result<Vec<ColumnInfo>, String>{
     };
 }
 
-pub fn build_schema_map(columns: Vec<ColumnInfo>) -> HashMap<String, HashMap<String, ColumnInfo>> {
-    let mut schema_map: HashMap<String, HashMap<String, ColumnInfo>> = HashMap::new();
+pub fn build_schema_map(columns: Vec<ColumnInfo>) -> HashMap<String, IndexMap<String, ColumnInfo>> {
+    let mut schema_map: HashMap<String, IndexMap<String, ColumnInfo>> = HashMap::new();
 
     for column in columns {
         // Use table_schema.table_name as the key to distinguish tables with the same name in different schemas
-        let table_key = format!("{}.{}", column.table_schema, column.table_name);
+        let table_key = format!("`{}`.{}", column.table_schema, column.table_name);
         let column_name = column.column_name.clone();
 
         schema_map
             .entry(table_key)
-            .or_insert_with(HashMap::new)
+            .or_insert_with(IndexMap::new)
             .insert(column_name, column);
     }
-
     schema_map
 }
 
 pub fn compare_schema_maps(
-    map1: &HashMap<String, HashMap<String, ColumnInfo>>,
-    map2: &HashMap<String, HashMap<String, ColumnInfo>>
+    map1: &HashMap<String, IndexMap<String, ColumnInfo>>,
+    map2: &HashMap<String, IndexMap<String, ColumnInfo>>
 ) -> SchemaDiff {
+    // extract key from map1, map2
+    // Kmap1 - Kmap2
+    // Kmap2 - Kmap1
     let tables1: HashSet<&String> = map1.keys().collect();
     let tables2: HashSet<&String> = map2.keys().collect();
 
@@ -209,24 +281,20 @@ pub fn compare_schema_maps(
     let tables_only_in_first_with_schema: Vec<(String, String)> = tables_only_in_first
         .iter()
         .map(|key| {
-            let parts: Vec<&str> = key.split('.').collect();
-            if parts.len() >= 2 {
-                (parts[0].to_string(), parts[1].to_string())
-            } else {
-                ("public".to_string(), parts[0].to_string()) // Default to public schema
-            }
+            // create fieldname
+            // [0: db name, 1:table name] -> [0: db_name.table_name, 1:sql field]
+            let table = map1.get(key).expect("get column info");
+            let sql = generate_sql_create_table(table);
+            (key.clone(), sql.expect("translate data to sql"))
         })
         .collect();
 
     let tables_only_in_second_with_schema: Vec<(String, String)> = tables_only_in_second
         .iter()
         .map(|key| {
-            let parts: Vec<&str> = key.split('.').collect();
-            if parts.len() >= 2 {
-                (parts[0].to_string(), parts[1].to_string())
-            } else {
-                ("public".to_string(), parts[0].to_string()) // Default to public schema
-            }
+            let table = map2.get(key).expect("get column info");
+            let sql = generate_sql_create_table(table);
+            (key.clone(), sql.expect("translate data to sql"))
         })
         .collect();
 
@@ -239,15 +307,31 @@ pub fn compare_schema_maps(
     }
 }
 
+    fn generate_sql_create_table(data: &IndexMap<String,ColumnInfo>) -> Option<String>{
+        let mut sql = String::new();
+        for (_, value) in data {
+            // set default for int
+            let mut data = format_column_definition(&value);
+            data.push_str(",");
+            sql+=&data;
+        }
+        if sql.is_empty(){
+            None
+        }else{
+            Some(sql)
+        }
+    }
+
     pub fn generate_sql_diff(diff: &SchemaDiff) -> HashMap<String, String> {
     let mut sql_statements = HashMap::new();
 
     // Changes needed to transform schema 1 into schema 2
     // Drop tables that exist only in schema 1
     if !diff.tables_only_in_first.is_empty() {
-        for (table_schema, table_name) in &diff.tables_only_in_first {
+        for (table_name, _) in &diff.tables_only_in_first {
+            // println!("{}", table_name);
             let key = format!("Drop table in Schema 1 (Schema 1 only)");
-            let value = format!("DROP TABLE {}.{};", table_schema, table_name);
+            let value = format!("DROP TABLE {};", table_name);
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
             } else {
@@ -257,10 +341,11 @@ pub fn compare_schema_maps(
     }
 
     // Create tables that exist only in schema 2
+    // please provide collapse CREATE TABLE Field name
     if !diff.tables_only_in_second.is_empty() {
-        for (table_schema, table_name) in &diff.tables_only_in_second {
+        for (table_name, table_column) in &diff.tables_only_in_second {
             let key = format!("Create table in Schema 1 (Schema 2 only)");
-            let value = format!("-- CREATE TABLE {}.{} (...);", table_schema, table_name);
+            let value = format!("-- CREATE TABLE {} ({});", table_name, table_column);
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
             } else {
@@ -274,7 +359,7 @@ pub fn compare_schema_maps(
         for column in &diff.columns_only_in_first {
             let key = format!("Drop column in Schema 1 (Schema 1 only)");
             let value = format!(
-                "ALTER TABLE {}.{} DROP COLUMN {};",
+                "ALTER TABLE `{}`.{} DROP COLUMN {};",
                 column.table_schema, column.table_name, column.column_name
             );
             if let Some(existing) = sql_statements.get_mut(&key) {
@@ -291,8 +376,8 @@ pub fn compare_schema_maps(
             let column_def = format_column_definition(column);
             let key = format!("Add column in Schema 1 (Schema 2 only)");
             let value = format!(
-                "ALTER TABLE {}.{} ADD COLUMN {} {};",
-                column.table_schema, column.table_name, column.column_name, column_def
+                "ALTER TABLE `{}`.{} ADD COLUMN {};",
+                column.table_schema, column.table_name, column_def
             );
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
@@ -309,8 +394,8 @@ pub fn compare_schema_maps(
             let column_def = format_column_definition(&diff_item.second);
             let key = format!("Modify column in Schema 1");
             let value = format!(
-                "ALTER TABLE {}.{} MODIFY COLUMN {} {};",
-                diff_item.second.table_schema, diff_item.table_name, diff_item.column_name, column_def
+                "ALTER TABLE `{}`.{} MODIFY COLUMN {};",
+                diff_item.second.table_schema, diff_item.table_name, column_def
             );
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
@@ -323,9 +408,9 @@ pub fn compare_schema_maps(
     // Changes needed to transform schema 2 into schema 1 (reverse of above)
     // Drop tables that exist only in schema 2
     if !diff.tables_only_in_second.is_empty() {
-        for (table_schema, table_name) in &diff.tables_only_in_second {
+        for (table_name, _) in &diff.tables_only_in_second {
             let key = format!("Drop table in Schema 2 (Schema 2 only)");
-            let value = format!("DROP TABLE {}.{};", table_schema, table_name);
+            let value = format!("DROP TABLE {};", table_name);
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
             } else {
@@ -336,9 +421,9 @@ pub fn compare_schema_maps(
 
     // Create tables that exist only in schema 1
     if !diff.tables_only_in_first.is_empty() {
-        for (table_schema, table_name) in &diff.tables_only_in_first {
+        for (table_name, table_column) in &diff.tables_only_in_first {
             let key = format!("Create table in Schema 2 (Schema 1 only)");
-            let value = format!("-- CREATE TABLE {}.{} (...);", table_schema, table_name);
+            let value = format!("-- CREATE TABLE {} ({});", table_name, table_column);
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
             } else {
@@ -353,8 +438,8 @@ pub fn compare_schema_maps(
             let column_def = format_column_definition(column);
             let key = format!("Add column in Schema 2 (Schema 1 only)");
             let value = format!(
-                "ALTER TABLE {}.{} ADD COLUMN {} {};",
-                column.table_schema, column.table_name, column.column_name, column_def
+                "ALTER TABLE `{}`.{} ADD COLUMN {};",
+                column.table_schema, column.table_name, column_def
             );
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
@@ -369,7 +454,7 @@ pub fn compare_schema_maps(
         for column in &diff.columns_only_in_second {
             let key = format!("Drop column in Schema 2 (Schema 2 only)");
             let value = format!(
-                "ALTER TABLE {}.{} DROP COLUMN {};",
+                "ALTER TABLE `{}`.{} DROP COLUMN {};",
                 column.table_schema, column.table_name, column.column_name
             );
             if let Some(existing) = sql_statements.get_mut(&key) {
@@ -387,8 +472,8 @@ pub fn compare_schema_maps(
             let column_def = format_column_definition(&diff_item.first);
             let key = format!("Modify column in Schema 2");
             let value = format!(
-                "ALTER TABLE {}.{} MODIFY COLUMN {} {};",
-                diff_item.first.table_schema, diff_item.table_name, diff_item.column_name, column_def
+                "ALTER TABLE `{}`.{} MODIFY COLUMN {};",
+                diff_item.first.table_schema, diff_item.table_name, column_def
             );
             if let Some(existing) = sql_statements.get_mut(&key) {
                 *existing = format!("{}\n{}", existing, value);
@@ -403,34 +488,38 @@ pub fn compare_schema_maps(
 
 
 fn format_column_definition(column: &ColumnInfo) -> String {
-    let mut definition = column.data_type.clone();
-
-    // Add character maximum length for string types
-    if let Some(length) = column.character_maximum_length {
-        if column.data_type == "varchar" || column.data_type == "char" {
-            definition = format!("{}({})", column.data_type, length);
-        }
-    }
-
-    // Add NULL/NOT NULL constraint
-    if column.is_nullable == "NO" {
-        definition.push_str(" NOT NULL");
+    // fieldname, datatype, null, default
+    let field_name = &column.column_name;
+    let column_type = column.column_type.to_lowercase();
+    let is_null = if column.is_nullable.to_lowercase() == "no" {
+        String::from("NOT NULL")
     } else {
-        definition.push_str(" NULL");
-    }
+        String::from("NULL")
+    };
 
-    // Add default value if present
-    if let Some(default) = &column.column_default {
-        if default == "NULL" {
-            definition.push_str(" DEFAULT NULL");
-        } else if default.chars().all(|c| c.is_ascii_digit()) {
-            definition.push_str(&format!(" DEFAULT {}", default));
-        } else {
-            definition.push_str(&format!(" DEFAULT '{}'", default.replace("'", "''")));
-        }
-    }
+    let field_default = match &column.column_default{
+        Some(d) => format!(" DEFAULT {}", d).to_string(),
+        None => "".to_string(),
+    };
 
-    definition
+    let extra = match &column.extra{
+        Some(d) => format!(" {}", d).to_string(),
+        None => "".to_string(),
+    };
+
+    let comment = match &column.column_comment{
+        Some(d) => {
+            if d!="" {
+                format!(" COMMENT '{}'", d).to_string()
+            }else{
+                "".to_string()
+            }
+        },
+        None => "".to_string(),
+    };
+
+    format!("{} {} {}{}{}{}", field_name, column_type, is_null, field_default, extra, comment).to_string()
+    // definition
 }
 
 #[wasm_bindgen]

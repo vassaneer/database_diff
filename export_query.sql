@@ -4,6 +4,9 @@ SELECT
     column_name,
     data_type,
     is_nullable,
+    column_type,
+    extra,
+    column_comment,
     column_default,
     character_maximum_length
 FROM information_schema.COLUMNS

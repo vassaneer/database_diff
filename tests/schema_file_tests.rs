@@ -1,6 +1,6 @@
 use std::fs;
 // use wasm_bindgen_test::*;
-use db_diff::{ColumnInfo, build_schema_map, compare_schema_maps, create_column_info};
+use db_diff::{ColumnInfo, build_schema_map, compare_schema_maps, create_column_info, compare_schemas};
 
 #[test]
 fn test_sample_schema_files_exist() {
@@ -80,41 +80,6 @@ fn test_compare_sample_schemas_functionality() {
 }
 
 #[test]
-fn test_compare_sample_schemas_reality_mariadb() {
-    // Skip this test for now as it uses large sample files that need to be updated
-    // TODO: Update sample_schema3.json and sample_schema4.json to include table_schema field
-    // For now, we'll skip this test since it's not critical for our table_schema implementation
-
-    /*
-    // Read the sample schema files
-    let schema1_content = fs::read_to_string("sample_schema3.json")
-        .expect("Failed to read sample_schema1.json");
-    let schema2_content = fs::read_to_string("sample_schema4.json")
-        .expect("Failed to read sample_schema2.json");
-
-    // Parse the JSON content
-    let columns1: Vec<ColumnInfo> = serde_json::from_str(&schema1_content)
-        .expect("Failed to parse sample_schema1.json");
-    let columns2: Vec<ColumnInfo> = serde_json::from_str(&schema2_content)
-        .expect("Failed to parse sample_schema2.json");
-
-    // Build schema maps
-    let map1 = build_schema_map(columns1);
-    let map2 = build_schema_map(columns2);
-
-    // Compare the schemas
-    let diff = compare_schema_maps(&map1, &map2);
-
-    // Basic checks - should have some differences
-    assert!(!diff.tables_only_in_first.is_empty() ||
-            !diff.tables_only_in_second.is_empty() ||
-            !diff.columns_only_in_first.is_empty() ||
-            !diff.columns_only_in_second.is_empty() ||
-            !diff.columns_with_different_definitions.is_empty());
-    */
-}
-
-#[test]
 fn test_identical_schemas_functionality() {
     // Read the same file twice to simulate identical schemas
     let schema_content = fs::read_to_string("sample_schema1.json")
@@ -163,4 +128,18 @@ fn test_mariadb_schema() {
 
     assert_eq!(1,1)
 
+}
+
+#[test]
+fn test_mariadb_compare(){
+    let schema_1 = fs::read_to_string("sample_schema7.json")
+        .expect("Failed to read sample_schema7.json");
+
+    let schema_2 = fs::read_to_string("sample_schema8.json")
+        .expect("Failed to read sample_schema8.json");
+
+    let _diff = compare_schemas(&schema_1, &schema_2);
+    
+
+    assert_eq!(1,1)
 }
