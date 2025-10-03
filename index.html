@@ -142,6 +142,9 @@
 <body>
     <div class="container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <button id="modeToggle" class="tutorial-btn">
+                Switch to Index Comparison
+            </button>
             <div style="flex-grow: 1; text-align: center;">
                 <h1 style="margin: 0;">Database Schema Comparison</h1>
             </div>
@@ -151,11 +154,12 @@
         </div>
 
         <div class="input-section">
-            <h2>First Schema</h2>
+            
+            <h2 id="firstLabel">First Schema</h2>
             <textarea id="schema1" placeholder='[{"table_name": "users", "column_name": "id", "data_type": "integer", ...}, ...]'></textarea>
             <input type="file" id="file-input-1">
 
-            <h2>Second Schema</h2>
+            <h2 id="secondLabel">Second Schema</h2>
             <textarea id="schema2" placeholder='[{"table_name": "users", "column_name": "id", "data_type": "bigint", ...}, ...]'></textarea>
             <input type="file" id="file-input-2">
             <button id="compareBtn">Compare Schemas</button>
@@ -168,7 +172,7 @@
     </div>
 
     <script type="module">
-        import init, { compare_schemas, process_uploaded_file } from './pkg/db_diff.js';
+        import init, { compare_schemas, process_uploaded_file, compare_indexs } from './pkg/db_diff.js';
 
         // Wait for the page to load
         document.addEventListener('DOMContentLoaded', async function() {
@@ -187,16 +191,55 @@
 
             // Set up the tutorial button
             document.getElementById('tutorialBtn').addEventListener('click', function() {
+                // Determine which mode we're in to show the appropriate export query
+                const exportQuery = isIndexMode 
+                    ? 'export_index.sql' 
+                    : 'export_query.sql';
+                
+                const exportTitle = isIndexMode 
+                    ? 'Export Index Query' 
+                    : 'Export Schema Query';
+                
                 // Load the export query SQL file content
-                fetch('export_query.sql')
+                fetch(exportQuery)
                     .then(response => response.text())
                     .then(data => {
-                        alert("To export your database schema:\n\n1. Replace 'your_database_name' in the query with your actual database name.\n2. Run the query in your database client.\n3. Export the results as JSON format.\n4. Paste the JSON into the schema text areas above.\n\nExport Query:\n" + data);
+                        const exportDescription = isIndexMode 
+                            ? "To export your database indexes:\n\n1. Run the query in your database client.\n2. Export the results as JSON format.\n3. Paste the JSON into the index data text areas above."
+                            : "To export your database schema:\n\n1. Replace 'your_database_name' in the query with your actual database name.\n2. Run the query in your database client.\n3. Export the results as JSON format.\n4. Paste the JSON into the schema text areas above.";
+                            
+                        alert(exportDescription + "\n\n" + exportTitle + ":\n" + data);
                     })
                     .catch(error => {
                         console.error('Error loading export query:', error);
-                        alert('Error loading export query. Please check the export_query.sql file.');
+                        alert('Error loading export query. Please check the ' + exportQuery + ' file.');
                     });
+            });
+
+            // Set up comparison mode
+            let isIndexMode = false;
+            
+            // Set up the mode toggle button
+            document.getElementById('modeToggle').addEventListener('click', function() {
+                isIndexMode = !isIndexMode;
+                
+                // Update button text
+                this.textContent = isIndexMode ? 
+                    'Switch to Schema Comparison' : 
+                    'Switch to Index Comparison';
+                
+                // Update labels
+                document.getElementById('firstLabel').textContent = isIndexMode ? 
+                    'First Index Data' : 
+                    'First Schema';
+                document.getElementById('secondLabel').textContent = isIndexMode ? 
+                    'Second Index Data' : 
+                    'Second Schema';
+                
+                // Update button text
+                document.getElementById('compareBtn').textContent = isIndexMode ? 
+                    'Compare Indexes' : 
+                    'Compare Schemas';
             });
 
             // Set up the compare button
@@ -205,13 +248,18 @@
                 const schema2Text = document.getElementById('schema2').value;
 
                 if (!schema1Text || !schema2Text) {
-                    alert('Please provide both schemas');
+                    alert('Please provide both ' + (isIndexMode ? 'index data' : 'schemas'));
                     return;
                 }
 
                 try {
-                    // Call the WASM function
-                    const result = compare_schemas(schema1Text, schema2Text);
+                    // Call the appropriate WASM function based on mode
+                    let result;
+                    if (isIndexMode) {
+                        result = compare_indexs(schema1Text, schema2Text);
+                    } else {
+                        result = compare_schemas(schema1Text, schema2Text);
+                    }
 
                     // Check if the result is an error message from the WASM function
                     if (result.startsWith("Error parsing first JSON:") ||
@@ -279,100 +327,170 @@
                     return;
                 }
 
-                // Check if there are any differences
-                const hasDifferences =
-                    (diff.tables_only_in_first && diff.tables_only_in_first.length > 0) ||
-                    (diff.tables_only_in_second && diff.tables_only_in_second.length > 0) ||
-                    (diff.columns_only_in_first && diff.columns_only_in_first.length > 0) ||
-                    (diff.columns_only_in_second && diff.columns_only_in_second.length > 0) ||
-                    (diff.columns_with_different_definitions && diff.columns_with_different_definitions.length > 0);
+                // Check if we're in index mode to adjust the display
+                const isIndexComparison = diff.hasOwnProperty('indexes_only_in_first') || 
+                                         diff.hasOwnProperty('indexes_only_in_second') || 
+                                         diff.hasOwnProperty('indexes_with_different_definitions');
 
-                if (!hasDifferences) {
-                    diffContent.innerHTML = '<p>No differences found between the schemas.</p>';
+                if (isIndexComparison) {
+                    // Handle index comparison results
+                    const hasIndexDifferences =
+                        (diff.indexes_only_in_first && diff.indexes_only_in_first.length > 0) ||
+                        (diff.indexes_only_in_second && diff.indexes_only_in_second.length > 0) ||
+                        (diff.indexes_with_different_definitions && diff.indexes_with_different_definitions.length > 0);
+
+                    if (!hasIndexDifferences) {
+                        diffContent.innerHTML = '<p>No differences found between the indexes.</p>';
+                    } else {
+                        // Display indexes only in first schema
+                        if (diff.indexes_only_in_first && diff.indexes_only_in_first.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Indexes Only in First Schema</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.indexes_only_in_first.map(index =>
+                                        `<div class="removed">- ${index.table_schema}.${index.table_name}.${index.index_name} (${index.column_name})</div>`).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
+
+                        // Display indexes only in second schema
+                        if (diff.indexes_only_in_second && diff.indexes_only_in_second.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Indexes Only in Second Schema</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.indexes_only_in_second.map(index =>
+                                        `<div class="added">+ ${index.table_schema}.${index.table_name}.${index.index_name} (${index.column_name})</div>`).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
+
+                        // Display indexes with different definitions
+                        if (diff.indexes_with_different_definitions && diff.indexes_with_different_definitions.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Indexes with Different Definitions</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.indexes_with_different_definitions.map(diff => `
+                                        <div class="changed">${diff.table_name}.${diff.index_name}</div>
+                                        <div style="margin-left: 20px;">
+                                            <div>First: ${diff.first.column_name} (type: ${diff.first.index_type}, unique: ${diff.first.non_unique === 0 ? 'Yes' : 'No'})</div>
+                                            <div>Second: ${diff.second.column_name} (type: ${diff.second.index_type}, unique: ${diff.second.non_unique === 0 ? 'Yes' : 'No'})</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
+                    }
                 } else {
-                    // Display tables only in first schema
-                    if (diff.tables_only_in_first && diff.tables_only_in_first.length > 0) {
-                        const section = document.createElement('div');
-                        section.className = 'diff-result';
-                        section.innerHTML = `
-                            <div class="diff-header">
-                                <span class="diff-title">Tables Only in First Schema</span>
-                            </div>
-                            <div class="diff-content">
-                                ${diff.tables_only_in_first.map(([schema, table]) =>
-                                    `<div class="removed">- ${schema}.${table}</div>`).join('')}
-                            </div>
-                        `;
-                        diffContent.appendChild(section);
-                    }
+                    // Handle schema comparison results (original functionality)
+                    const hasDifferences =
+                        (diff.tables_only_in_first && diff.tables_only_in_first.length > 0) ||
+                        (diff.tables_only_in_second && diff.tables_only_in_second.length > 0) ||
+                        (diff.columns_only_in_first && diff.columns_only_in_first.length > 0) ||
+                        (diff.columns_only_in_second && diff.columns_only_in_second.length > 0) ||
+                        (diff.columns_with_different_definitions && diff.columns_with_different_definitions.length > 0);
 
-                    // Display tables only in second schema
-                    if (diff.tables_only_in_second && diff.tables_only_in_second.length > 0) {
-                        const section = document.createElement('div');
-                        section.className = 'diff-result';
-                        section.innerHTML = `
-                            <div class="diff-header">
-                                <span class="diff-title">Tables Only in Second Schema</span>
-                            </div>
-                            <div class="diff-content">
-                                ${diff.tables_only_in_second.map(([schema, table]) =>
-                                    `<div class="added">+ ${schema}.${table}</div>`).join('')}
-                            </div>
-                        `;
-                        diffContent.appendChild(section);
-                    }
+                    if (!hasDifferences) {
+                        diffContent.innerHTML = '<p>No differences found between the schemas.</p>';
+                    } else {
+                        // Display tables only in first schema
+                        if (diff.tables_only_in_first && diff.tables_only_in_first.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Tables Only in First Schema</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.tables_only_in_first.map(([schema, table]) =>
+                                        `<div class="removed">- ${schema}.${table}</div>`).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
 
-                    // Display columns only in first schema
-                    if (diff.columns_only_in_first && diff.columns_only_in_first.length > 0) {
-                        const section = document.createElement('div');
-                        section.className = 'diff-result';
-                        section.innerHTML = `
-                            <div class="diff-header">
-                                <span class="diff-title">Columns Only in First Schema</span>
-                            </div>
-                            <div class="diff-content">
-                                ${diff.columns_only_in_first.map(col =>
-                                    `<div class="removed">- ${col.table_schema}.${col.table_name}.${col.column_name} (${col.data_type})</div>`).join('')}
-                            </div>
-                        `;
-                        diffContent.appendChild(section);
-                    }
+                        // Display tables only in second schema
+                        if (diff.tables_only_in_second && diff.tables_only_in_second.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Tables Only in Second Schema</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.tables_only_in_second.map(([schema, table]) =>
+                                        `<div class="added">+ ${schema}.${table}</div>`).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
 
-                    // Display columns only in second schema
-                    if (diff.columns_only_in_second && diff.columns_only_in_second.length > 0) {
-                        const section = document.createElement('div');
-                        section.className = 'diff-result';
-                        section.innerHTML = `
-                            <div class="diff-header">
-                                <span class="diff-title">Columns Only in Second Schema</span>
-                            </div>
-                            <div class="diff-content">
-                                ${diff.columns_only_in_second.map(col =>
-                                    `<div class="added">+ ${col.table_schema}.${col.table_name}.${col.column_name} (${col.data_type})</div>`).join('')}
-                            </div>
-                        `;
-                        diffContent.appendChild(section);
-                    }
+                        // Display columns only in first schema
+                        if (diff.columns_only_in_first && diff.columns_only_in_first.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Columns Only in First Schema</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.columns_only_in_first.map(col =>
+                                        `<div class="removed">- ${col.table_schema}.${col.table_name}.${col.column_name} (${col.data_type})</div>`).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
 
-                    // Display columns with different definitions
-                    if (diff.columns_with_different_definitions && diff.columns_with_different_definitions.length > 0) {
-                        const section = document.createElement('div');
-                        section.className = 'diff-result';
-                        section.innerHTML = `
-                            <div class="diff-header">
-                                <span class="diff-title">Columns with Different Definitions</span>
-                            </div>
-                            <div class="diff-content">
-                                ${diff.columns_with_different_definitions.map(diff => `
-                                    <div class="changed">${diff.table_name}.${diff.column_name}</div>
-                                    <div style="margin-left: 20px;">
-                                        <div>First: ${diff.first.data_type} (nullable: ${diff.first.is_nullable})</div>
-                                        <div>Second: ${diff.second.data_type} (nullable: ${diff.second.is_nullable})</div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        `;
-                        diffContent.appendChild(section);
+                        // Display columns only in second schema
+                        if (diff.columns_only_in_second && diff.columns_only_in_second.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Columns Only in Second Schema</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.columns_only_in_second.map(col =>
+                                        `<div class="added">+ ${col.table_schema}.${col.table_name}.${col.column_name} (${col.data_type})</div>`).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
+
+                        // Display columns with different definitions
+                        if (diff.columns_with_different_definitions && diff.columns_with_different_definitions.length > 0) {
+                            const section = document.createElement('div');
+                            section.className = 'diff-result';
+                            section.innerHTML = `
+                                <div class="diff-header">
+                                    <span class="diff-title">Columns with Different Definitions</span>
+                                </div>
+                                <div class="diff-content">
+                                    ${diff.columns_with_different_definitions.map(diff => `
+                                        <div class="changed">${diff.table_name}.${diff.column_name}</div>
+                                        <div style="margin-left: 20px;">
+                                            <div>First: ${diff.first.data_type} (nullable: ${diff.first.is_nullable})</div>
+                                            <div>Second: ${diff.second.data_type} (nullable: ${diff.second.is_nullable})</div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `;
+                            diffContent.appendChild(section);
+                        }
                     }
                 }
 

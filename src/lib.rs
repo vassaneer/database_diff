@@ -8,6 +8,7 @@ use wasm_bindgen::JsCast;
 use js_sys::Promise;
 use encoding_rs;
 
+pub mod index;
 // Custom deserializer to handle both string and integer representations
 fn deserialize_optional_string_as_int<'de, D>(deserializer: D) -> Result<Option<u64>, D::Error>
 where
@@ -116,13 +117,13 @@ mod tests {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct MariaDBJson {
+pub struct MariaDBJson <T> {
     pub r#type: String,
     pub version: Option<String>,
     pub comment: Option<String>,
     pub name: Option<String>,
     pub database: Option<String>,
-    pub data: Option<Vec<ColumnInfo>>,
+    pub data: Option<Vec<T>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -184,7 +185,7 @@ pub fn create_column_info(json: &str) -> Result<Vec<ColumnInfo>, String>{
      match serde_json::from_str::<Vec<ColumnInfo>>(json) {
         Ok(columns) => return Ok(columns),
         Err(_) => {
-            match serde_json::from_str::<Vec<MariaDBJson>>(json){
+            match serde_json::from_str::<Vec<MariaDBJson<ColumnInfo>>>(json){
                 Ok(column) => {
                         for i in 1..column.len(){
                             if column[i].data.is_some() {return Ok(column[i].data.clone().unwrap());}
