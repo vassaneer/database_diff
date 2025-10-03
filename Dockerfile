@@ -18,6 +18,7 @@ COPY Cargo.toml ./
 COPY src/ ./src/
 COPY index.html ./
 COPY export_query.sql ./
+COPY export_index.sql ./
 
 # Build the WASM package (this will generate a new Cargo.lock)
 RUN mkdir -p pkg && \
@@ -28,6 +29,7 @@ FROM nginx:alpine
 # Copy the built files to nginx
 COPY --from=builder /app/index.html /usr/share/nginx/html/
 COPY --from=builder /app/export_query.sql /usr/share/nginx/html/
+COPY --from=builder /app/export_index.sql /usr/share/nginx/html/
 COPY --from=builder /app/pkg /usr/share/nginx/html/pkg
 
 # Expose port
